@@ -38,7 +38,7 @@ class RegisterScreen extends HookConsumerWidget {
             children: [
               // Title
               Text(
-                'Join Magnum Opus',
+                'Join Wizard Gift',
                 style: Theme.of(context).textTheme.headlineSmall?.copyWith(
                   color: Colors.white,
                   fontWeight: FontWeight.bold,

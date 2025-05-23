@@ -73,7 +73,7 @@ class MagnumOpusApp extends ConsumerWidget {
     final onboardingCompleted = ref.watch(onboardingCompletedProvider);
     
     return MaterialApp(
-      title: 'Magnum Opus',
+      title: 'Wizard Gift',
       theme: AppTheme.darkTheme,
       debugShowCheckedModeBanner: false,
       navigatorKey: navigatorKey, // Use the global navigator key
@@ -120,7 +120,7 @@ class SplashScreen extends StatelessWidget {
             
             // App name
             const Text(
-              'Magnum Opus',
+              'Wizard Gift',
               style: TextStyle(
                 color: Colors.white,
                 fontSize: 28,

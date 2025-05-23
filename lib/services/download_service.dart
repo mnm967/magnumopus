@@ -1,7 +1,6 @@
 import 'dart:io';
 import 'dart:isolate';
 import 'dart:ui';
-import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_downloader/flutter_downloader.dart';
@@ -25,11 +24,6 @@ final lessonDownloadStatusProvider = StreamProvider.family<bool, String>((ref, l
   return ref.watch(downloadServiceProvider).getLessonDownloadStatus(lessonId);
 });
 
-/// Provider to get download progress for a specific lesson
-final lessonDownloadProgressProvider = StreamProvider.family<int, String>((ref, lessonId) {
-  return ref.watch(downloadServiceProvider).getDownloadProgress(lessonId);
-});
-
 /// Service to handle downloading and storing video lessons
 @pragma('vm:entry-point')
 class DownloadService {
@@ -40,9 +34,6 @@ class DownloadService {
   
   /// Send port for receiving download status updates
   final ReceivePort _port = ReceivePort();
-
-  /// Map to store current download progress
-  final Map<String, StreamController<int>> _progressControllers = {};
   
   /// Initialize the download service
   Future<void> initialize() async {
@@ -59,9 +50,6 @@ class DownloadService {
       final status = data[1] as DownloadTaskStatus;
       final progress = data[2] as int;
       
-      // Update progress for any active downloads
-      _updateProgress(taskId, progress);
-      
       _updateDownloadStatus(taskId, status, progress);
     });
   }
@@ -69,12 +57,6 @@ class DownloadService {
   /// Clean up resources when the service is no longer needed
   void dispose() {
     IsolateNameServer.removePortNameMapping(_portName);
-    
-    // Close all progress controllers
-    for (final controller in _progressControllers.values) {
-      controller.close();
-    }
-    _progressControllers.clear();
   }
   
   /// Static download callback that runs in the download isolate
@@ -85,99 +67,6 @@ class DownloadService {
       final taskStatus = DownloadTaskStatus.values[status];
       sendPort.send([id, taskStatus, progress]);
     }
-  }
-
-  /// Update progress for a download task
-  void _updateProgress(String taskId, int progress) {
-    // Check if we have a task ID mapping to a lesson ID
-    _getTaskToLessonMapping().then((taskToLessonMap) {
-      final lessonId = taskToLessonMap[taskId];
-      if (lessonId != null) {
-        // Get or create a controller for this lesson
-        if (!_progressControllers.containsKey(lessonId)) {
-          _progressControllers[lessonId] = StreamController<int>.broadcast();
-        }
-        
-        // Add the progress update to the stream
-        if (!_progressControllers[lessonId]!.isClosed) {
-          _progressControllers[lessonId]!.add(progress);
-        }
-        
-        // If download is complete or failed, close the controller
-        if (progress == 100) {
-          Future.delayed(const Duration(seconds: 1), () {
-            if (_progressControllers.containsKey(lessonId) && 
-                !_progressControllers[lessonId]!.isClosed) {
-              _progressControllers[lessonId]!.close();
-              _progressControllers.remove(lessonId);
-            }
-          });
-        }
-      }
-    });
-  }
-  
-  /// Get a mapping from task IDs to lesson IDs
-  Future<Map<String, String>> _getTaskToLessonMapping() async {
-    final Map<String, String> taskToLessonMap = {};
-    
-    // Get the box containing downloaded lessons
-    final box = await Hive.openBox<Lesson>(_boxName);
-    
-    // For each entry, store the task ID to lesson ID mapping
-    for (final entry in box.toMap().entries) {
-      final taskId = entry.key.toString();
-      final lesson = entry.value;
-      taskToLessonMap[taskId] = lesson.id;
-    }
-    
-    return taskToLessonMap;
-  }
-  
-  /// Get a stream of download progress for a specific lesson
-  Stream<int> getDownloadProgress(String lessonId) async* {
-    // Initial progress value
-    yield 0;
-    
-    // Check if we have an active controller for this lesson
-    if (_progressControllers.containsKey(lessonId)) {
-      yield* _progressControllers[lessonId]!.stream;
-    } else {
-      // Create a new controller for this lesson
-      _progressControllers[lessonId] = StreamController<int>.broadcast();
-      
-      // Check if there's an active download task for this lesson
-      final taskId = await _getTaskIdForLesson(lessonId);
-      if (taskId != null) {
-        // Get current progress from FlutterDownloader
-        final tasks = await FlutterDownloader.loadTasks();
-        if (tasks != null) {
-          for (final task in tasks) {
-            if (task.taskId == taskId) {
-              // Add current progress to the stream
-              _progressControllers[lessonId]!.add(task.progress);
-              break;
-            }
-          }
-        }
-      }
-      
-      yield* _progressControllers[lessonId]!.stream;
-    }
-  }
-  
-  /// Get the task ID for a lesson
-  Future<String?> _getTaskIdForLesson(String lessonId) async {
-    final taskToLessonMap = await _getTaskToLessonMapping();
-    
-    // Find the task ID where the lesson ID matches
-    for (final entry in taskToLessonMap.entries) {
-      if (entry.value == lessonId) {
-        return entry.key;
-      }
-    }
-    
-    return null;
   }
   
   /// Start downloading a lesson
@@ -230,11 +119,6 @@ class DownloadService {
       // Save the lesson to Hive with the taskId as the key
       await box.put(taskId, lessonCopy);
       
-      // Create a stream controller for this download if it doesn't exist
-      if (!_progressControllers.containsKey(lesson.id)) {
-        _progressControllers[lesson.id] = StreamController<int>.broadcast();
-      }
-      
     } catch (e) {
       debugPrint('Error downloading lesson: $e');
       rethrow;
@@ -242,29 +126,12 @@ class DownloadService {
   }
   
   /// Cancel a download in progress
-  Future<void> cancelDownload(String lessonId) async {
-    try {
-      // Find the task ID for this lesson
-      final taskId = await _getTaskIdForLesson(lessonId);
-      if (taskId != null) {
-        await FlutterDownloader.cancel(taskId: taskId);
-        
-        // Remove from Hive
-        final box = await Hive.openBox<Lesson>(_boxName);
-        await box.delete(taskId);
-        
-        // Close and remove the progress controller
-        if (_progressControllers.containsKey(lessonId)) {
-          if (!_progressControllers[lessonId]!.isClosed) {
-            _progressControllers[lessonId]!.close();
-          }
-          _progressControllers.remove(lessonId);
-        }
-      }
-    } catch (e) {
-      debugPrint('Error cancelling download: $e');
-      rethrow;
-    }
+  Future<void> cancelDownload(String taskId) async {
+    await FlutterDownloader.cancel(taskId: taskId);
+    
+    // Remove from Hive
+    final box = await Hive.openBox<Lesson>(_boxName);
+    await box.delete(taskId);
   }
   
   /// Delete a downloaded lesson
@@ -310,14 +177,6 @@ class DownloadService {
           break;
         }
       }
-      
-      // Close and remove the progress controller if it exists
-      if (_progressControllers.containsKey(lesson.id)) {
-        if (!_progressControllers[lesson.id]!.isClosed) {
-          _progressControllers[lesson.id]!.close();
-        }
-        _progressControllers.remove(lesson.id);
-      }
     } catch (e) {
       debugPrint('Error deleting download: $e');
       rethrow;
@@ -352,35 +211,10 @@ class DownloadService {
           );
           
           await box.put(taskId, updatedLesson);
-          
-          // Close the progress controller with a final 100% update
-          if (_progressControllers.containsKey(lesson.id)) {
-            if (!_progressControllers[lesson.id]!.isClosed) {
-              _progressControllers[lesson.id]!.add(100);
-              // We'll close it after a delay to ensure the UI can show 100%
-            }
-          }
         } 
         // If download failed, remove it from the box
         else if (status == DownloadTaskStatus.failed || status == DownloadTaskStatus.canceled) {
           await box.delete(taskId);
-          
-          // Send error to progress controller and close it
-          if (_progressControllers.containsKey(lesson.id)) {
-            if (!_progressControllers[lesson.id]!.isClosed) {
-              _progressControllers[lesson.id]!.addError('Download ${status.toString().split('.').last}');
-              _progressControllers[lesson.id]!.close();
-              _progressControllers.remove(lesson.id);
-            }
-          }
-        }
-        // If download is in progress, update the progress controller
-        else if (status == DownloadTaskStatus.running) {
-          if (_progressControllers.containsKey(lesson.id)) {
-            if (!_progressControllers[lesson.id]!.isClosed) {
-              _progressControllers[lesson.id]!.add(progress);
-            }
-          }
         }
       }
     } catch (e) {

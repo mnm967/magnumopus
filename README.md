@@ -1,10 +1,10 @@
-# Magnum Opus - Trading Education Platform
+# Wizard Gift - Trading Education Platform
 
 A modern mobile application for trading education, built with Flutter, Firebase, and Riverpod.
 
 ## Overview
 
-Magnum Opus is a comprehensive trading education platform that provides:
+Wizard Gift is a comprehensive trading education platform that provides:
 - Video-based courses with organized trading content
 - Community interaction for traders to share insights
 - AI-powered assistants for learning support
@@ -162,4 +162,4 @@ This project is proprietary and confidential.
 
 ## Credits
 
-Developed for One Lance B's Magnum Opus platform.
+Developed for Wizard Gift platform.

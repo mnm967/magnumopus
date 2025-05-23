@@ -3,7 +3,7 @@
 # Script to run the Firebase data seeder
 
 echo "================================================"
-echo "  Magnum Opus Firebase Data Seeder"
+echo "  Wizard Gift Firebase Data Seeder"
 echo "================================================"
 echo ""
 

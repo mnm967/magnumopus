@@ -656,79 +656,23 @@ class LessonPlayerScreen extends HookConsumerWidget {
                 Consumer(
                   builder: (context, ref, _) {
                     final downloadStatus = ref.watch(lessonDownloadStatusProvider(lesson.id));
-                    final downloadProgress = ref.watch(lessonDownloadProgressProvider(lesson.id));
                     
                     return downloadStatus.when(
-                      data: (isDownloaded) {
-                        // Check if download is in progress
-                        final isDownloading = downloadProgress.maybeWhen(
-                          data: (progress) => progress > 0 && progress < 100,
-                          orElse: () => false,
-                        );
-                        
-                        if (isDownloading) {
-                          // Show progress circular indicator
-                          return downloadProgress.when(
-                            data: (progress) => Stack(
-                              alignment: Alignment.center,
-                              children: [
-                                SizedBox(
-                                  width: 36,
-                                  height: 36,
-                                  child: CircularProgressIndicator(
-                                    value: progress / 100,
-                                    backgroundColor: Colors.white.withOpacity(0.2),
-                                    valueColor: const AlwaysStoppedAnimation<Color>(Colors.white),
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                                Text(
-                                  '${progress.round()}%',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            loading: () => const SizedBox(
-                              width: 36,
-                              height: 36,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                              ),
-                            ),
-                            error: (_, __) => IconButton(
-                              icon: const Icon(
-                                Icons.error_outline,
-                                color: AppTheme.errorColor,
-                              ),
-                              onPressed: () {
-                                _downloadLesson(context, ref, lesson);
-                              },
-                            ),
-                          );
-                        }
-                        
-                        // Show download or completed button
-                        return IconButton(
-                          icon: Icon(
-                            isDownloaded 
-                                ? Icons.download_done 
-                                : Icons.download_for_offline_outlined,
-                            color: Colors.white,
-                          ),
-                          onPressed: () {
-                            if (isDownloaded) {
-                              _deleteDownload(context, ref, lesson);
-                            } else {
-                              _downloadLesson(context, ref, lesson);
-                            }
-                          },
-                        );
-                      },
+                      data: (isDownloaded) => IconButton(
+                        icon: Icon(
+                          isDownloaded 
+                              ? Icons.download_done 
+                              : Icons.download_for_offline_outlined,
+                          color: Colors.white,
+                        ),
+                        onPressed: () {
+                          if (isDownloaded) {
+                            _deleteDownload(context, ref, lesson);
+                          } else {
+                            _downloadLesson(context, ref, lesson);
+                          }
+                        },
+                      ),
                       loading: () => const SizedBox(
                         width: 48,
                         height: 48,
@@ -1506,7 +1450,6 @@ class LessonPlayerScreen extends HookConsumerWidget {
         return;
       }
       
-      // Start the download
       await downloadService.downloadLesson(lesson);
       
       if (context.mounted) {

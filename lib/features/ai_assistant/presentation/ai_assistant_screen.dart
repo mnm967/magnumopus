@@ -178,6 +178,8 @@ class ExamplePromptItem extends HookConsumerWidget {
     final communityRepo = ref.read(communityRepositoryProvider);
     final conversation = ref.read(currentAIConversationProvider);
     final chatNotifier = ref.read(chatStateProvider.notifier);
+    final openAIService = ref.read(openAIServiceProvider);
+    final isChatNotifierMounted = chatNotifier.mounted;
     
     // Start the process
     chatNotifier.startLoading();
@@ -185,7 +187,9 @@ class ExamplePromptItem extends HookConsumerWidget {
     // Get current user and create conversation
     authRepo.currentUser.first.then((user) {
       if (user == null) {
-        chatNotifier.setError('User not logged in');
+        if (isChatNotifierMounted) {
+          chatNotifier.setError('User not logged in');
+        }
         return;
       }
       
@@ -198,8 +202,11 @@ class ExamplePromptItem extends HookConsumerWidget {
           : communityRepo.createAIConversation(userId: user.id, title: title);
           
       futureConversation.then((convo) {
+        // Check if still mounted
+        if (!isChatNotifierMounted) return;
+        
         // Set as current conversation if new
-        if (conversation == null) {
+        if (conversation == null && ref.read(currentAIConversationProvider.notifier).mounted) {
           ref.read(currentAIConversationProvider.notifier).state = convo;
         }
         
@@ -208,8 +215,14 @@ class ExamplePromptItem extends HookConsumerWidget {
           conversationId: convo.id,
           userMessage: prompt,
         ).then((_) {
+          // Check if still mounted
+          if (!isChatNotifierMounted) return;
+          
           // Get previous messages for context
           communityRepo.getAIMessages(convo.id).first.then((messages) {
+            // Check if still mounted
+            if (!isChatNotifierMounted) return;
+            
             // Format messages for OpenAI
             final previousMessages = messages
               .take(10)
@@ -222,12 +235,14 @@ class ExamplePromptItem extends HookConsumerWidget {
               .toList();
               
             // Get AI response
-            final openAIService = ref.read(openAIServiceProvider);
             openAIService.getChatResponse(
               userMessage: prompt,
               previousMessages: previousMessages,
               stockData: null,
             ).then((response) {
+              // Check if still mounted
+              if (!isChatNotifierMounted) return;
+              
               // Save the AI response
               FirebaseFirestore.instance
                 .collection('ai_conversations')
@@ -239,32 +254,46 @@ class ExamplePromptItem extends HookConsumerWidget {
                   'timestamp': FieldValue.serverTimestamp(),
                 })
                 .then((_) {
-                  // Reset loading state
-                  chatNotifier.reset();
+                  // Reset loading state if still mounted
+                  if (isChatNotifierMounted) {
+                    chatNotifier.reset();
+                  }
                 })
                 .catchError((e) {
                   debugPrint('Error adding AI response: $e');
-                  chatNotifier.setError('Error saving AI response');
+                  if (isChatNotifierMounted) {
+                    chatNotifier.setError('Error saving AI response');
+                  }
                 });
             }).catchError((e) {
               debugPrint('Error getting AI response: $e');
-              chatNotifier.setError('Error getting AI response');
+              if (isChatNotifierMounted) {
+                chatNotifier.setError('Error getting AI response');
+              }
             });
           }).catchError((e) {
             debugPrint('Error getting messages: $e');
-            chatNotifier.setError('Error getting messages');
+            if (isChatNotifierMounted) {
+              chatNotifier.setError('Error getting messages');
+            }
           });
         }).catchError((e) {
           debugPrint('Error sending message: $e');
-          chatNotifier.setError('Error sending message');
+          if (isChatNotifierMounted) {
+            chatNotifier.setError('Error sending message');
+          }
         });
       }).catchError((e) {
         debugPrint('Error creating conversation: $e');
-        chatNotifier.setError('Error creating conversation');
+        if (isChatNotifierMounted) {
+          chatNotifier.setError('Error creating conversation');
+        }
       });
     }).catchError((e) {
       debugPrint('Error getting user: $e');
-      chatNotifier.setError('Error getting user');
+      if (isChatNotifierMounted) {
+        chatNotifier.setError('Error getting user');
+      }
     });
   }
 }
@@ -333,32 +362,37 @@ class AIAssistantScreen extends HookConsumerWidget {
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Assistant introduction or selected conversation title
-          _buildHeader(context, currentConversation),
-          
-          // Market data panel (conditionally visible)
-          if (showMarketData)
-            _buildMarketDataPanel(context, ref),
-          
-          // Messages area
-          Expanded(
-            child: currentConversation != null
-                ? _buildConversationMessages(context, ref, currentConversation.id)
-                : _buildWelcomeScreen(context),
-          ),
-          
-          // Input area
-          _buildMessageInput(
-            context,
-            ref,
-            messageController,
-            userMessage,
-            currentConversation,
-            chatState,
-          ),
-        ],
+      body: GestureDetector(
+        // Dismiss keyboard when tapping outside of any text field
+        onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+        behavior: HitTestBehavior.translucent,
+        child: Column(
+          children: [
+            // Assistant introduction or selected conversation title
+            _buildHeader(context, currentConversation),
+            
+            // Market data panel (conditionally visible)
+            if (showMarketData)
+              _buildMarketDataPanel(context, ref),
+            
+            // Messages area
+            Expanded(
+              child: currentConversation != null
+                  ? _buildConversationMessages(context, ref, currentConversation.id)
+                  : _buildWelcomeScreen(context),
+            ),
+            
+            // Input area
+            _buildMessageInput(
+              context,
+              ref,
+              messageController,
+              userMessage,
+              currentConversation,
+              chatState,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -516,15 +550,6 @@ class AIAssistantScreen extends HookConsumerWidget {
                     fontSize: 16,
                   ),
                 ),
-                Text(
-                  conversation != null
-                      ? 'Conversation: ${conversation.title}'
-                      : 'Powered by OpenAI',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.6),
-                    fontSize: 12,
-                  ),
-                ),
               ],
             ),
           ),
@@ -535,49 +560,52 @@ class AIAssistantScreen extends HookConsumerWidget {
   
   /// Build the welcome screen when no conversation is selected
   Widget _buildWelcomeScreen(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            // AI Icon
-            Icon(
-              Icons.auto_awesome,
-              size: 80,
-              color: AppTheme.primaryColor.withOpacity(0.8),
-            ).animate().scale(
-              begin: const Offset(0.8, 0.8),
-              end: const Offset(1.0, 1.0),
-              duration: 1.seconds,
-              curve: Curves.elasticOut,
-            ),
-            const SizedBox(height: 24),
-            
-            // Welcome text
-            Text(
-              'Hello, I\'m your Trading Assistant',
-              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                color: Colors.white,
-                fontWeight: FontWeight.bold,
+    return GestureDetector(
+      onTap: () => FocusManager.instance.primaryFocus?.unfocus(),
+      child: Center(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // AI Icon
+              Icon(
+                Icons.auto_awesome,
+                size: 80,
+                color: AppTheme.primaryColor.withOpacity(0.8),
+              ).animate().scale(
+                begin: const Offset(0.8, 0.8),
+                end: const Offset(1.0, 1.0),
+                duration: 1.seconds,
+                curve: Curves.elasticOut,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 16),
-            
-            Text(
-              'I can help you with trading concepts, analyze charts, summarize course content, and more.',
-              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: Colors.white.withOpacity(0.7),
-                height: 1.5,
+              const SizedBox(height: 24),
+              
+              // Welcome text
+              Text(
+                'Hello, I\'m your Trading Assistant',
+                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
               ),
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 32),
-            
-            // Example questions
-            ..._buildExamplePrompts(context),
-          ],
+              const SizedBox(height: 16),
+              
+              Text(
+                'I can help you with trading concepts, analyze charts, summarize course content, and more.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Colors.white.withOpacity(0.7),
+                  height: 1.5,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 32),
+              
+              // Example questions
+              ..._buildExamplePrompts(context),
+            ],
+          ),
         ),
       ),
     );
@@ -601,6 +629,25 @@ class AIAssistantScreen extends HookConsumerWidget {
   /// Build the messages in a conversation
   Widget _buildConversationMessages(BuildContext context, WidgetRef ref, String conversationId) {
     final messagesAsync = ref.watch(aiMessagesProvider(conversationId));
+    // Create a ScrollController to detect scrolling
+    final scrollController = useScrollController();
+    
+    // Add a listener to dismiss keyboard when scrolling
+    useEffect(() {
+      void dismissKeyboardOnScroll() {
+        // If any scroll occurs, dismiss the keyboard
+        if (FocusScope.of(context).hasFocus) {
+          FocusScope.of(context).unfocus();
+        }
+      }
+      
+      scrollController.addListener(dismissKeyboardOnScroll);
+      
+      // Clean up when widget is disposed
+      return () {
+        scrollController.removeListener(dismissKeyboardOnScroll);
+      };
+    }, [scrollController]);
     
     return messagesAsync.when(
       data: (messages) {
@@ -615,14 +662,19 @@ class AIAssistantScreen extends HookConsumerWidget {
           );
         }
         
-        return ListView.builder(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-          itemCount: messages.length,
-          reverse: true,
-          itemBuilder: (context, index) {
-            final message = messages[messages.length - 1 - index]; // Reverse order
-            return _buildMessageBubble(context, message);
-          },
+        return GestureDetector(
+          // Dismiss keyboard when tapping anywhere in the list
+          onTap: () => FocusScope.of(context).unfocus(),
+          child: ListView.builder(
+            controller: scrollController,
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            itemCount: messages.length,
+            reverse: true,
+            itemBuilder: (context, index) {
+              final message = messages[messages.length - 1 - index]; // Reverse order
+              return _buildMessageBubble(context, message);
+            },
+          ),
         );
       },
       loading: () => const Center(
@@ -765,6 +817,12 @@ class AIAssistantScreen extends HookConsumerWidget {
                   );
                 }
               },
+              // Add callback to hide keyboard when done is pressed
+              onEditingComplete: () => FocusScope.of(context).unfocus(),
+              // Handle submission with the keyboard's enter/done button
+              onSubmitted: conversation != null && !isLoading && message.isNotEmpty 
+                  ? (_) => _sendMessageSafely(context, ref, controller, conversation)
+                  : null,
             ),
           ),
           const SizedBox(width: 8),
@@ -1051,21 +1109,27 @@ class AIAssistantScreen extends HookConsumerWidget {
     String message,
     AIConversation conversation,
   ) async {
+    // Capture all needed references and values at the beginning to avoid ref access after widget disposal
+    final communityRepository = ref.read(communityRepositoryProvider);
+    final openAIService = ref.read(openAIServiceProvider);
+    final shouldIncludeMarketData = ref.read(showMarketDataProvider);
+    final stockService = shouldIncludeMarketData ? ref.read(stockServiceProvider) : null;
+    final chatStateNotifier = ref.read(chatStateProvider.notifier);
+    final isChatStateNotifierMounted = chatStateNotifier.mounted;
+    
     try {
       // Get market data for context if enabled
       String? marketContext;
-      try {
-        if (ref.read(showMarketDataProvider)) {
-          final stockService = ref.read(stockServiceProvider);
+      if (shouldIncludeMarketData && stockService != null) {
+        try {
           marketContext = await stockService.getFormattedMarketContext();
+        } catch (e) {
+          debugPrint('Error getting market data: $e');
         }
-      } catch (e) {
-        debugPrint('Error getting market data: $e');
       }
       
       // Get previous messages to build conversation history
       final previousMessages = <Map<String, String>>[];
-      final communityRepository = ref.read(communityRepositoryProvider);
       
       try {
         final messages = await communityRepository.getAIMessages(conversation.id).first;
@@ -1090,7 +1154,6 @@ class AIAssistantScreen extends HookConsumerWidget {
       );
       
       // Get AI response using OpenAI service
-      final openAIService = ref.read(openAIServiceProvider);
       final response = await openAIService.getChatResponse(
         userMessage: message,
         previousMessages: previousMessages,
@@ -1102,21 +1165,13 @@ class AIAssistantScreen extends HookConsumerWidget {
       await _addAIResponse(communityRepository, conversation.id, response);
       
       // Reset state after sending if still mounted
-      try {
-        if (ref.read(chatStateProvider.notifier).mounted) {
-          ref.read(chatStateProvider.notifier).reset();
-        }
-      } catch (e) {
-        debugPrint('Error resetting chat state: $e');
+      if (isChatStateNotifierMounted) {
+        chatStateNotifier.reset();
       }
     } catch (e) {
       debugPrint('Error in message sending process: $e');
-      try {
-        if (ref.read(chatStateProvider.notifier).mounted) {
-          ref.read(chatStateProvider.notifier).setError('Error sending message');
-        }
-      } catch (e) {
-        debugPrint('Error updating error state: $e');
+      if (isChatStateNotifierMounted) {
+        chatStateNotifier.setError('Error sending message');
       }
     }
   }

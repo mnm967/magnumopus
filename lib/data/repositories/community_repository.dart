@@ -354,14 +354,6 @@ class CommunityRepository {
       });
       
       await batch.commit();
-      
-      // Note: In a real app, you would call OpenAI's API here through a Cloud Function
-      // and then add the AI's response to the conversation.
-      // For now, we'll simulate this with a placeholder response.
-      
-      // We won't actually implement the OpenAI call here, as it should be in a Cloud Function
-      // This is a placeholder for where you'd add the AI response
-      await _addAIResponse(conversationId, "This is a simulated AI response.");
     } catch (e, stack) {
       AppLogger.error('Error sending AI message', e, stack);
       rethrow;

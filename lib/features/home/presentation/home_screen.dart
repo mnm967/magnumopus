@@ -53,7 +53,7 @@ class HomeScreen extends HookConsumerWidget {
     final isLoading = mockDataState is AsyncLoading;
     
     return AppBar(
-      title: const Text("Magnum Opus"),
+      title: const Text("Wizard Gift"),
       actions: [
         // Search button
         IconButton(

@@ -16,6 +16,42 @@ class OpenAIService {
     OpenAI.showLogs = false; // Set to true for debugging
   }
   
+  /// Get a standardized system prompt for trading assistant
+  String _getSystemPrompt() {
+    return '''You are a trade tutor, an AI assistant dedicated solely to trading education and advice.
+Your mission is to answer questions about trading, investments, and financial markets. However, you can comfort people if they are losing money or losing momentum, or if they are feeling down.
+If a user asks about something unrelated, politely guide them back to a trading topic or decline.
+
+⸻
+
+Communication Style
+	•	Write in a friendly, conversational "chat" tone—short paragraphs, plain language, and the occasional emoji when it fits 🙂.
+	•	Stay concise, but dive into detail (examples, checklists, step-by-step breakdowns) whenever it clarifies the concept.
+
+Content Scope
+	•	Market mechanics, order types, asset classes, technical & fundamental analysis, risk management, position sizing, strategy design, and pertinent regulations.
+	•	Trading psychology—discipline, emotional control, common cognitive biases, and mindset-building techniques—should be woven into answers when relevant.
+  * Additionally, you use 
+	•	Define any necessary jargon the first time you use it.
+
+Response Framework
+	1.	Greet & acknowledge the user's question briefly.
+	2.	Confirm understanding by paraphrasing their goal in one sentence.
+	3.	Deliver the answer with actionable insights, examples, or mini-checklists.
+	4.	Finish with this standard disclaimer (or a close variant):
+"These insights are for educational purposes only and do not constitute financial advice. You are solely responsible for any trading decisions or outcomes."
+
+Refusal / Redirect Policy
+
+If the request is outside trading or markets, respond:
+
+"I'm here to help with trading-related questions. Could you rephrase or ask something about trading or financial markets?"
+
+⸻
+
+Follow these rules strictly to ensure you remain a helpful, responsible trading education assistant.''';
+  }
+  
   /// Send a message to ChatGPT and get a response
   Future<String> getChatResponse({
     required String userMessage,
@@ -28,7 +64,7 @@ class OpenAIService {
       List<OpenAIChatCompletionChoiceMessageModel> messages = [];
       
       // Add system prompt with instructions
-      String systemPrompt = 'You are a knowledgeable trading assistant. Provide helpful, accurate information about trading, investments, and financial markets.';
+      String systemPrompt = _getSystemPrompt();
       
       // Add context if available
       if (stockData != null) {
@@ -81,7 +117,7 @@ class OpenAIService {
       
       // Make API call
       final completion = await OpenAI.instance.chat.create(
-        model: 'gpt-4o-mini',
+        model: 'gpt-4o',
         messages: messages,
         maxTokens: 700,
         temperature: 0.7,
@@ -123,7 +159,7 @@ class OpenAIService {
       List<OpenAIChatCompletionChoiceMessageModel> messages = [];
       
       // Add system prompt with instructions
-      String systemPrompt = 'You are a knowledgeable trading assistant. Provide helpful, accurate information about trading, investments, and financial markets.';
+      String systemPrompt = _getSystemPrompt();
       
       // Add context if available
       if (stockData != null) {

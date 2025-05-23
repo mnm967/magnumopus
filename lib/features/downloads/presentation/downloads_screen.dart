@@ -182,12 +182,6 @@ class DownloadsScreen extends HookConsumerWidget {
                       ),
                     ),
                   const SizedBox(height: 12),
-                  
-                  // Download progress indicator (if download is in progress)
-                  _buildDownloadProgress(ref, lesson),
-                  
-                  const SizedBox(height: 8),
-                  
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
@@ -253,78 +247,6 @@ class DownloadsScreen extends HookConsumerWidget {
           ],
         ),
       ),
-    );
-  }
-  
-  /// Build the download progress indicator
-  Widget _buildDownloadProgress(WidgetRef ref, Lesson lesson) {
-    // Watch the progress for this lesson
-    final progressAsync = ref.watch(lessonDownloadProgressProvider(lesson.id));
-    
-    return progressAsync.when(
-      data: (progress) {
-        // Only show progress bar if download is in progress (not 0 or 100)
-        if (progress > 0 && progress < 100) {
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    'Downloading...',
-                    style: TextStyle(
-                      color: AppTheme.primaryColor,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    '$progress%',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              LinearProgressIndicator(
-                value: progress / 100,
-                backgroundColor: Colors.white.withOpacity(0.2),
-                valueColor: const AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
-                minHeight: 4,
-              ),
-              const SizedBox(height: 8),
-              
-              // Cancel button
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    final downloadService = ref.read(downloadServiceProvider);
-                    downloadService.cancelDownload(lesson.id);
-                  },
-                  style: TextButton.styleFrom(
-                    padding: EdgeInsets.zero,
-                    minimumSize: const Size(60, 30),
-                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                  ),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(
-                      fontSize: 12,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          );
-        }
-        return const SizedBox.shrink(); // Don't show anything if not downloading
-      },
-      loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
     );
   }
   

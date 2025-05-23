@@ -62,7 +62,7 @@ class LoginScreen extends HookConsumerWidget {
                   
                   // App name
                   Text(
-                    'Magnum Opus',
+                    'Wizard Gift',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,

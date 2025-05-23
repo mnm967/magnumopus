@@ -1,4 +1,4 @@
-# One Lance B App Development Specifications
+# App Development Specifications
 _Exported on 5/19/2025 at 16:56:00 CDT from Cursor (0.50.4)_
 
 ---
@@ -8,13 +8,13 @@ _Exported on 5/19/2025 at 16:56:00 CDT from Cursor (0.50.4)_
 
 **Cursor**
 
-Let me create a new Flutter project for the One Lance B app and implement the core structure based on your specifications.
+Let me create a new Flutter project for the app and implement the core structure based on your specifications.
 
 Now, let's set up the project structure and add necessary dependencies to pubspec.yaml:
 
 ```yaml
 name: lancebapp
-description: "One Lance B's Magnum Opus Trading Education Platform"
+description: "Wizard Gift"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -223,7 +223,7 @@ Let's correct the pubspec.yaml file with valid packages and versions:
 
 ```yaml
 name: lancebapp
-description: "One Lance B's Magnum Opus Trading Education Platform"
+description: "Wizard Gift"
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -1056,7 +1056,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             const SizedBox(height: 12),
             // Tagline
             const Text(
-              'Magnum Opus Trading',
+              'Wizard Gift',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.white70,
@@ -1280,7 +1280,7 @@ class LoginScreen extends HookConsumerWidget {
                   
                   // Subtitle
                   const Text(
-                    'Magnum Opus Trading',
+                    'Wizard Gift',
                     style: TextStyle(
                       fontSize: 16,
                       color: Colors.white70,
