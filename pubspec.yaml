@@ -81,6 +81,9 @@ dependencies:
   connectivity_plus: ^5.0.1
   flutter_svg: ^2.0.9
   flutter_downloader: ^1.11.5
+  http: ^1.4.0
+  percent_indicator: ^4.2.5
+  syncfusion_flutter_pdf: ^29.2.5
 
 dev_dependencies:
   flutter_test:

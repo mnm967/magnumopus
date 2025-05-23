@@ -46,6 +46,8 @@ abstract class Message with _$Message {
     String? userAvatarUrl,
     required String text,
     String? imageUrl, // If the message contains an image
+    String? fileType, // Type of the file (image, pdf, doc, etc.)
+    String? fileName, // Name of the uploaded file
     @Default(MessageType.user) MessageType type,
     String? replyToMessageId, // If it's a reply to another message
     required DateTime timestamp,
@@ -107,6 +109,8 @@ abstract class AIMessage with _$AIMessage {
     required bool isUserMessage, // true if sent by user, false if AI response
     required String content,
     String? imageUrl, // For image uploads by user
+    String? fileType, // Type of the file (image, pdf, doc, etc.)
+    String? fileName, // Name of the uploaded file
     required DateTime timestamp,
   }) = _AIMessage;
   

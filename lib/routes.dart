@@ -10,6 +10,7 @@ import 'package:magnumopus/features/courses/presentation/lesson_player_screen.da
 import 'package:magnumopus/features/community/presentation/community_screen.dart';
 import 'package:magnumopus/features/profile/presentation/profile_screen.dart';
 import 'package:magnumopus/features/onboarding/presentation/onboarding_screen.dart';
+import 'package:magnumopus/features/downloads/presentation/downloads_screen.dart';
 
 /// Routes class for managing app navigation
 class AppRoutes {
@@ -26,6 +27,7 @@ class AppRoutes {
   static const String chat = '/chat';
   static const String aiAssistant = '/ai-assistant';
   static const String profile = '/profile';
+  static const String downloads = '/downloads';
   
   // Home screen getter for direct navigation
   static Widget getHomeScreen() => const HomeScreen();
@@ -82,6 +84,9 @@ class AppRoutes {
         
       case profile:
         return MaterialPageRoute(builder: (_) => const ProfileScreen());
+        
+      case downloads:
+        return MaterialPageRoute(builder: (_) => const DownloadsScreen());
         
       default:
         // If the route is not found, redirect to home

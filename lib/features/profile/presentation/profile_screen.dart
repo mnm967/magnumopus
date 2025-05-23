@@ -344,7 +344,7 @@ class ProfileScreen extends HookConsumerWidget {
     }
   }
   
-  /// Build a list of other profile sections
+  /// Build profile action sections
   Widget _buildProfileSections(BuildContext context, User user) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -357,106 +357,46 @@ class ProfileScreen extends HookConsumerWidget {
             fontSize: 18,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 8),
         
-        AppCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              _buildProfileMenuItem(
-                context,
-                title: 'Edit Profile',
-                icon: Icons.edit,
-                onTap: () {
-                  // Navigate to edit profile
-                },
-              ),
-              _buildProfileMenuItem(
-                context,
-                title: 'My Downloads',
-                icon: Icons.download_for_offline_outlined,
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => const DownloadsScreen()),
-                  );
-                },
-              ),
-              _buildProfileMenuItem(
-                context,
-                title: 'Notifications',
-                icon: Icons.notifications_outlined,
-                onTap: () {
-                  // Navigate to notifications settings
-                },
-              ),
-              _buildProfileMenuItem(
-                context,
-                title: 'Payment Methods',
-                icon: Icons.payment_outlined,
-                onTap: () {
-                  // Navigate to payment methods
-                },
-              ),
-              _buildProfileMenuItem(
-                context,
-                title: 'Privacy Settings',
-                icon: Icons.privacy_tip_outlined,
-                onTap: () {
-                  // Navigate to privacy settings
-                },
-                showDivider: false,
-              ),
-            ],
-          ),
+        // Profile sections
+        _buildProfileSection(
+          context,
+          title: 'My Downloaded Content',
+          icon: Icons.download_done_rounded,
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (context) => const DownloadsScreen()),
+            );
+          },
         ),
-        
-        const SizedBox(height: 24),
-        
-        const Text(
-          'Support',
-          style: TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-            fontSize: 18,
-          ),
+        _buildProfileSection(
+          context,
+          title: 'My Courses',
+          icon: Icons.school,
+          onTap: () {
+            // Navigate to user courses
+          },
         ),
-        const SizedBox(height: 16),
-        
-        AppCard(
-          padding: EdgeInsets.zero,
-          child: Column(
-            children: [
-              _buildProfileMenuItem(
-                context,
-                title: 'Help Center',
-                icon: Icons.help_outline,
-                onTap: () {
-                  // Navigate to help center
-                },
-              ),
-              _buildProfileMenuItem(
-                context,
-                title: 'Contact Support',
-                icon: Icons.support_agent_outlined,
-                onTap: () {
-                  // Navigate to contact support
-                },
-              ),
-              _buildProfileMenuItem(
-                context,
-                title: 'About',
-                icon: Icons.info_outline,
-                onTap: () {
-                  // Navigate to about page
-                },
-                showDivider: false,
-              ),
-            ],
-          ),
+        _buildProfileSection(
+          context,
+          title: 'Progress & Certificates',
+          icon: Icons.workspace_premium,
+          onTap: () {
+            // Navigate to progress screen
+          },
+        ),
+        _buildProfileSection(
+          context,
+          title: 'Account Settings',
+          icon: Icons.settings,
+          onTap: () {
+            // Navigate to account settings
+          },
         ),
       ],
-    ).animate().fadeIn(duration: 600.ms, delay: 400.ms).moveY(begin: 20, end: 0, duration: 600.ms);
+    );
   }
   
   /// Build a statistic chip
@@ -614,5 +554,40 @@ class ProfileScreen extends HookConsumerWidget {
     } else {
       return _formatDate(lastSeen);
     }
+  }
+  
+  /// Build a profile section item
+  Widget _buildProfileSection(
+    BuildContext context, {
+    required String title,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Card(
+      margin: const EdgeInsets.only(bottom: 12),
+      color: AppTheme.cardColor,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: ListTile(
+        leading: Icon(
+          icon,
+          color: AppTheme.primaryColor,
+        ),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios,
+          color: Colors.white54,
+          size: 16,
+        ),
+        onTap: onTap,
+      ),
+    );
   }
 } 

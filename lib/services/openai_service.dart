@@ -1,6 +1,10 @@
+import 'dart:io';
+import 'dart:convert';
 import 'package:dart_openai/dart_openai.dart';
 import 'package:flutter/material.dart';
 import 'package:hooks_riverpod/hooks_riverpod.dart';
+import 'package:path/path.dart' as path;
+import 'package:http/http.dart' as http;
 
 /// Provider for the OpenAI service
 final openAIServiceProvider = Provider<OpenAIService>((ref) {
@@ -9,8 +13,12 @@ final openAIServiceProvider = Provider<OpenAIService>((ref) {
 
 /// Service to handle interactions with OpenAI API
 class OpenAIService {
+  // Private field to store API key
+  static String? _apiKey;
+  
   /// Initialize the OpenAI service with API key
   static void initialize(String apiKey) {
+    _apiKey = apiKey;
     OpenAI.apiKey = apiKey;
     OpenAI.showResponsesLogs = false; // Set to true for debugging
     OpenAI.showLogs = false; // Set to true for debugging
@@ -31,14 +39,13 @@ Communication Style
 Content Scope
 	•	Market mechanics, order types, asset classes, technical & fundamental analysis, risk management, position sizing, strategy design, and pertinent regulations.
 	•	Trading psychology—discipline, emotional control, common cognitive biases, and mindset-building techniques—should be woven into answers when relevant.
-  * Additionally, you use 
 	•	Define any necessary jargon the first time you use it.
 
 Response Framework
 	1.	Greet & acknowledge the user's question briefly.
 	2.	Confirm understanding by paraphrasing their goal in one sentence.
 	3.	Deliver the answer with actionable insights, examples, or mini-checklists.
-	4.	Finish with this standard disclaimer (or a close variant):
+	4.	Finish with this standard disclaimer (or a close variant) if they are asking about a specific stock or trade:
 "These insights are for educational purposes only and do not constitute financial advice. You are solely responsible for any trading decisions or outcomes."
 
 Refusal / Redirect Policy
@@ -241,6 +248,224 @@ Follow these rules strictly to ensure you remain a helpful, responsible trading 
     } catch (e) {
       debugPrint('Error streaming chat response: $e');
       yield 'Sorry, I encountered an issue processing your request. Please try again later.';
+    }
+  }
+  
+  /// Generate an image using DALL-E 3
+  /// Returns the URL of the generated image
+  Future<String> generateImage({
+    required String prompt,
+    OpenAIImageSize size = OpenAIImageSize.size1024,
+    OpenAIImageStyle style = OpenAIImageStyle.vivid,
+  }) async {
+    try {
+      final response = await OpenAI.instance.image.create(
+        model: 'dall-e-3',
+        prompt: prompt,
+        n: 1,
+        size: size,
+        style: style,
+        responseFormat: OpenAIImageResponseFormat.url,
+      );
+      
+      if (response.data.isEmpty) {
+        throw Exception('No images were generated');
+      }
+      
+      return response.data.first.url!;
+    } catch (e) {
+      debugPrint('Error generating image: $e');
+      throw Exception('Failed to generate image: ${e.toString()}');
+    }
+  }
+  
+  /// Create a variation of an existing image
+  /// Returns the URL of the generated variation
+  Future<String> createImageVariation(File image) async {
+    try {
+      final response = await OpenAI.instance.image.variation(
+        image: image,
+        n: 1,
+        responseFormat: OpenAIImageResponseFormat.url,
+        size: OpenAIImageSize.size1024,
+      );
+      
+      if (response.data.isEmpty) {
+        throw Exception('No image variations were generated');
+      }
+      
+      return response.data.first.url!;
+    } catch (e) {
+      debugPrint('Error creating image variation: $e');
+      throw Exception('Failed to create image variation: ${e.toString()}');
+    }
+  }
+  
+  /// Process an image with ChatGPT to get image-based responses
+  /// Uses direct HTTP request to handle images properly
+  Future<String> processImageWithChatGPT({
+    required String prompt,
+    required File imageFile,
+    List<Map<String, String>> previousMessages = const [],
+  }) async {
+    try {
+      // Use the stored API key
+      final apiKey = _apiKey;
+      if (apiKey == null || apiKey.isEmpty) {
+        throw Exception('OpenAI API key is not set');
+      }
+      
+      // Get file extension and encode image to base64
+      final imageBytes = await imageFile.readAsBytes();
+      final base64Image = base64Encode(imageBytes);
+      
+      // Construct the messages array
+      final List<Map<String, dynamic>> messages = [];
+      
+      // Add system message
+      messages.add({
+        'role': 'system',
+        'content': _getSystemPrompt(),
+      });
+      
+      // Add previous messages if provided
+      for (final message in previousMessages) {
+        messages.add({
+          'role': message['role'] ?? 'user',
+          'content': message['content'] ?? '',
+        });
+      }
+      
+      // Add the current message with image
+      messages.add({
+        'role': 'user',
+        'content': [
+          {'type': 'text', 'text': prompt},
+          {
+            'type': 'image_url',
+            'image_url': {
+              'url': 'data:image/jpeg;base64,$base64Image'
+            }
+          }
+        ]
+      });
+      
+      // Make direct API call with http package
+      final response = await http.post(
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        headers: {
+          'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': 'gpt-4o',
+          'messages': messages,
+          'max_tokens': 700,
+          'temperature': 0.7,
+        }),
+      );
+      
+      if (response.statusCode != 200) {
+        debugPrint('API Error: ${response.statusCode} - ${response.body}');
+        return 'Error processing image: ${response.statusCode}';
+      }
+      
+      final jsonResponse = jsonDecode(response.body);
+      
+      if (jsonResponse['choices'] == null || 
+          jsonResponse['choices'].isEmpty || 
+          jsonResponse['choices'][0]['message'] == null ||
+          jsonResponse['choices'][0]['message']['content'] == null) {
+        return "I couldn't generate a response for this image.";
+      }
+      
+      return jsonResponse['choices'][0]['message']['content'];
+    } catch (e) {
+      debugPrint('Error processing image with ChatGPT: $e');
+      return 'Sorry, I encountered an issue analyzing this image. Please try again later.';
+    }
+  }
+  
+  /// Process a document with ChatGPT to get document-based responses
+  /// Uses direct HTTP request to handle documents properly
+  Future<String> processDocumentWithChatGPT({
+    required String prompt,
+    required File documentFile,
+    List<Map<String, String>> previousMessages = const [],
+  }) async {
+    try {
+      // Use the stored API key
+      final apiKey = _apiKey;
+      if (apiKey == null || apiKey.isEmpty) {
+        throw Exception('OpenAI API key is not set');
+      }
+      
+      // Read the document content
+      final documentContent = await documentFile.readAsString();
+      
+      // Construct the messages array
+      final List<Map<String, dynamic>> messages = [];
+      
+      // Add system message with additional context for document analysis
+      final systemPrompt = '''${_getSystemPrompt()}
+      
+Additional Context: You are now analyzing a document. Focus on extracting and explaining any trading-related information, patterns, or insights from the document. If the document contains financial data, charts, or trading strategies, pay special attention to those elements.''';
+      
+      messages.add({
+        'role': 'system',
+        'content': systemPrompt,
+      });
+      
+      // Add previous messages if provided
+      for (final message in previousMessages) {
+        messages.add({
+          'role': message['role'] ?? 'user',
+          'content': message['content'] ?? '',
+        });
+      }
+      
+      // Add the current message with document content
+      messages.add({
+        'role': 'user',
+        'content': '''$prompt
+
+Document Content:
+$documentContent'''
+      });
+      
+      // Make direct API call with http package
+      final response = await http.post(
+        Uri.parse('https://api.openai.com/v1/chat/completions'),
+        headers: {
+          'Authorization': 'Bearer $apiKey',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'model': 'gpt-4o-mini',
+          'messages': messages,
+          'max_tokens': 1000, // Increased for document analysis
+          'temperature': 0.7,
+        }),
+      );
+      
+      if (response.statusCode != 200) {
+        debugPrint('API Error: ${response.statusCode} - ${response.body}');
+        return 'Error processing document: ${response.statusCode}';
+      }
+      
+      final jsonResponse = jsonDecode(response.body);
+      
+      if (jsonResponse['choices'] == null || 
+          jsonResponse['choices'].isEmpty || 
+          jsonResponse['choices'][0]['message'] == null ||
+          jsonResponse['choices'][0]['message']['content'] == null) {
+        return "I couldn't generate a response for this document.";
+      }
+      
+      return jsonResponse['choices'][0]['message']['content'];
+    } catch (e) {
+      debugPrint('Error processing document with ChatGPT: $e');
+      return 'Sorry, I encountered an issue analyzing this document. Please try again later.';
     }
   }
 } 

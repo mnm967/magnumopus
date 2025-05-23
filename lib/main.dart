@@ -36,10 +36,12 @@ void main() async {
   
   // Open Hive boxes
   await Hive.openBox<Lesson>('downloaded_lessons'); // Open box for lessons
+  await Hive.openBox<Map>('download_progress'); // Open box for progress tracking
   
   // Initialize FlutterDownloader
   await FlutterDownloader.initialize(
     debug: true, // Set to false in production
+    ignoreSsl: true, // Add this for development if needed
   );
   
   // Create and initialize the DownloadService

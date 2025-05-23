@@ -100,6 +100,8 @@ class CommunityRepository {
                 userAvatarUrl: data['userAvatarUrl'] as String?,
                 text: data['text'] as String? ?? '',
                 imageUrl: data['imageUrl'] as String?,
+                fileType: data['fileType'] as String?,
+                fileName: data['fileName'] as String?,
                 type: _parseMessageType(data['type']),
                 replyToMessageId: data['replyToMessageId'] as String?,
                 timestamp: _parseTimestamp(data['timestamp']) ?? DateTime.now(),
@@ -120,6 +122,8 @@ class CommunityRepository {
     String? userAvatarUrl,
     required String text,
     String? imageUrl,
+    String? fileType,
+    String? fileName,
     String? replyToMessageId,
   }) async {
     try {
@@ -138,6 +142,8 @@ class CommunityRepository {
         'userAvatarUrl': userAvatarUrl,
         'text': text,
         'imageUrl': imageUrl,
+        'fileType': fileType,
+        'fileName': fileName,
         'type': 'user',
         'replyToMessageId': replyToMessageId,
         'timestamp': FieldValue.serverTimestamp(),

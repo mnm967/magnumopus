@@ -51,6 +51,8 @@ _$MessageImpl _$$MessageImplFromJson(Map<String, dynamic> json) =>
       userAvatarUrl: json['userAvatarUrl'] as String?,
       text: json['text'] as String,
       imageUrl: json['imageUrl'] as String?,
+      fileType: json['fileType'] as String?,
+      fileName: json['fileName'] as String?,
       type: $enumDecodeNullable(_$MessageTypeEnumMap, json['type']) ??
           MessageType.user,
       replyToMessageId: json['replyToMessageId'] as String?,
@@ -66,6 +68,8 @@ Map<String, dynamic> _$$MessageImplToJson(_$MessageImpl instance) =>
       'userAvatarUrl': instance.userAvatarUrl,
       'text': instance.text,
       'imageUrl': instance.imageUrl,
+      'fileType': instance.fileType,
+      'fileName': instance.fileName,
       'type': _$MessageTypeEnumMap[instance.type]!,
       'replyToMessageId': instance.replyToMessageId,
       'timestamp': instance.timestamp.toIso8601String(),
@@ -107,6 +111,8 @@ _$AIMessageImpl _$$AIMessageImplFromJson(Map<String, dynamic> json) =>
       isUserMessage: json['isUserMessage'] as bool,
       content: json['content'] as String,
       imageUrl: json['imageUrl'] as String?,
+      fileType: json['fileType'] as String?,
+      fileName: json['fileName'] as String?,
       timestamp: DateTime.parse(json['timestamp'] as String),
     );
 
@@ -117,5 +123,7 @@ Map<String, dynamic> _$$AIMessageImplToJson(_$AIMessageImpl instance) =>
       'isUserMessage': instance.isUserMessage,
       'content': instance.content,
       'imageUrl': instance.imageUrl,
+      'fileType': instance.fileType,
+      'fileName': instance.fileName,
       'timestamp': instance.timestamp.toIso8601String(),
     };

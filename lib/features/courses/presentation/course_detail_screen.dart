@@ -11,6 +11,7 @@ import 'package:magnumopus/data/repositories/auth_repository.dart';
 import 'package:magnumopus/data/repositories/course_repository.dart';
 import 'package:magnumopus/features/courses/presentation/lesson_player_screen.dart';
 import 'package:magnumopus/services/download_service.dart';
+import 'package:magnumopus/routes.dart';
 
 /// Provider to get a specific course
 final courseProvider = FutureProvider.family<Course?, String>((ref, courseId) {
@@ -41,6 +42,16 @@ class CourseDetailScreen extends HookConsumerWidget {
     
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackgroundColor,
+      appBar: AppBar(
+        title: Text('Course Details'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.download_rounded),
+            tooltip: 'Downloads',
+            onPressed: () => Navigator.of(context).pushNamed(AppRoutes.downloads),
+          ),
+        ],
+      ),
       body: courseAsync.when(
         data: (course) {
           if (course == null) {
@@ -404,23 +415,73 @@ class CourseDetailScreen extends HookConsumerWidget {
               Consumer(
                 builder: (context, ref, _) {
                   final downloadStatus = ref.watch(lessonDownloadStatusProvider(lesson.id));
+                  final downloadProgress = ref.watch(downloadProgressProvider(lesson.id));
                   
-                  return downloadStatus.when(
-                    data: (isDownloaded) => IconButton(
-                      icon: Icon(
-                        isDownloaded 
-                            ? Icons.download_done 
-                            : Icons.download_for_offline_outlined,
-                        color: AppTheme.primaryColor,
-                      ),
-                      onPressed: () {
-                        if (isDownloaded) {
-                          _deleteDownload(context, ref, lesson);
-                        } else {
+                  return downloadProgress.when(
+                    data: (progress) {
+                      // If downloading is in progress, show progress indicator
+                      if (progress.isActive) {
+                        return SizedBox(
+                          width: 48,
+                          height: 48,
+                          child: Stack(
+                            alignment: Alignment.center,
+                            children: [
+                              // Outer circle
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: AppTheme.primaryColor.withOpacity(0.2),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              // Progress circle
+                              SizedBox(
+                                width: 34,
+                                height: 34,
+                                child: CircularProgressIndicator(
+                                  value: progress.progress / 100,
+                                  valueColor: AlwaysStoppedAnimation<Color>(AppTheme.primaryColor),
+                                  strokeWidth: 3,
+                                ),
+                              ),
+                              // Progress text
+                              Text(
+                                "${progress.progress}%",
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: AppTheme.primaryColor,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      } 
+                      // If download completed, show appropriate icon
+                      else if (progress.isCompleted) {
+                        return IconButton(
+                          icon: const Icon(
+                            Icons.download_done,
+                            color: AppTheme.primaryColor,
+                          ),
+                          onPressed: () {
+                            _deleteDownload(context, ref, lesson);
+                          },
+                        );
+                      }
+                      // For all other states (not downloaded or error)
+                      return IconButton(
+                        icon: const Icon(
+                          Icons.download_for_offline_outlined,
+                          color: AppTheme.primaryColor,
+                        ),
+                        onPressed: () {
                           _downloadLesson(context, ref, lesson);
-                        }
-                      },
-                    ),
+                        },
+                      );
+                    },
                     loading: () => const SizedBox(
                       width: 48,
                       height: 48,
@@ -536,15 +597,27 @@ class CourseDetailScreen extends HookConsumerWidget {
         return;
       }
       
-      await downloadService.downloadLesson(lesson);
+      final taskId = await downloadService.downloadLesson(lesson);
       
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Downloading "${lesson.title}"'),
-            backgroundColor: AppTheme.successColor,
-          ),
-        );
+      if (taskId != null) {
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('Started downloading "${lesson.title}"'),
+              backgroundColor: AppTheme.successColor,
+              action: SnackBarAction(
+                label: 'View Downloads',
+                textColor: Colors.white,
+                onPressed: () {
+                  // Navigate to downloads screen
+                  Navigator.of(context).pushNamed('/downloads');
+                },
+              ),
+            ),
+          );
+        }
+      } else {
+        throw Exception('Failed to start download - no task ID returned');
       }
     } catch (e) {
       if (context.mounted) {

@@ -10,11 +10,11 @@ import 'package:magnumopus/data/models/community_model.dart';
 import 'package:magnumopus/data/models/user_model.dart';
 import 'package:magnumopus/data/repositories/auth_repository.dart';
 import 'package:magnumopus/data/repositories/community_repository.dart';
-import 'package:firebase_storage/firebase_storage.dart';
 import 'package:path/path.dart' as path;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:uuid/uuid.dart';
+import 'package:image_picker/image_picker.dart';
 
 /// Provider for the message input
 final messageInputProvider = StateProvider<String>((ref) => '');
@@ -27,8 +27,8 @@ final messageSendingStateProvider = StateProvider<AsyncValue<void>>((ref) {
 /// Provider for file attachment
 final attachmentProvider = StateProvider<File?>((ref) => null);
 
-/// Provider for attachment upload progress
-final attachmentUploadProgressProvider = StateProvider<double?>((ref) => null);
+/// Provider for attachment type
+final attachmentTypeProvider = StateProvider<String?>((ref) => null);
 
 /// Provider for channel messages
 final channelMessagesProvider = StreamProvider.family<List<Message>, String>((ref, channelId) {
@@ -58,7 +58,7 @@ class ChatScreen extends HookConsumerWidget {
     final userAsyncValue = ref.watch(currentUserProvider);
     final messagesAsyncValue = ref.watch(channelMessagesProvider(channelId));
     final attachment = ref.watch(attachmentProvider);
-    final uploadProgress = ref.watch(attachmentUploadProgressProvider);
+    final attachmentType = ref.watch(attachmentTypeProvider);
     
     return Scaffold(
       backgroundColor: AppTheme.scaffoldBackgroundColor,
@@ -234,14 +234,14 @@ class ChatScreen extends HookConsumerWidget {
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (uploadProgress != null)
+                        if (attachmentType != null)
                           Padding(
                             padding: const EdgeInsets.only(top: 8),
-                            child: LinearProgressIndicator(
-                              value: uploadProgress,
-                              backgroundColor: Colors.white.withOpacity(0.1),
-                              valueColor: AlwaysStoppedAnimation<Color>(
-                                AppTheme.primaryColor,
+                            child: Text(
+                              attachmentType,
+                              style: TextStyle(
+                                color: Colors.white.withOpacity(0.7),
+                                fontSize: 12,
                               ),
                             ),
                           ),
@@ -252,7 +252,7 @@ class ChatScreen extends HookConsumerWidget {
                     icon: const Icon(Icons.close, color: Colors.white70),
                     onPressed: () {
                       ref.read(attachmentProvider.notifier).state = null;
-                      ref.read(attachmentUploadProgressProvider.notifier).state = null;
+                      ref.read(attachmentTypeProvider.notifier).state = null;
                     },
                   ),
                 ],
@@ -410,10 +410,10 @@ class ChatScreen extends HookConsumerWidget {
               ),
             ),
                       
-                      // Image attachment (if any)
+                      // Image or file attachment (if any)
                       if (message.imageUrl != null) ...[
                         if (message.text.isNotEmpty) const SizedBox(height: 8),
-                        _buildAttachmentPreview(context, message.imageUrl!),
+                        _buildLocalAttachmentPreview(context, message),
                       ],
                       
                       // Timestamp
@@ -494,108 +494,7 @@ class ChatScreen extends HookConsumerWidget {
     );
   }
   
-  /// Build attachment preview widget
-  Widget _buildAttachmentPreview(BuildContext context, String url) {
-    final extension = path.extension(url).toLowerCase();
-    
-    // Check if the attachment is an image
-    if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].contains(extension)) {
-      return GestureDetector(
-        onTap: () => _openUrl(url),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(8),
-          child: CachedNetworkImage(
-            imageUrl: url,
-            height: 200,
-            fit: BoxFit.contain,
-            placeholder: (context, url) => Container(
-              height: 200,
-              color: Colors.black12,
-              child: const Center(child: AppLoadingIndicator()),
-            ),
-            errorWidget: (context, url, error) => Container(
-              height: 100,
-              color: Colors.black12,
-              child: const Center(
-                child: Icon(Icons.error, color: Colors.white54),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-    
-    // For video
-    if (['.mp4', '.mov', '.wmv', '.avi'].contains(extension)) {
-      return _buildFileAttachmentView(
-        context, url, 'Video File', Icons.video_file, Colors.redAccent);
-    }
-    
-    // For documents
-    if (['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'].contains(extension)) {
-      return _buildFileAttachmentView(
-        context, url, 'Document', Icons.insert_drive_file, Colors.blueAccent);
-    }
-    
-    // For other files
-    return _buildFileAttachmentView(
-      context, url, 'File Attachment', Icons.attach_file, Colors.purpleAccent);
-  }
-  
-  /// Build file attachment view
-  Widget _buildFileAttachmentView(
-    BuildContext context, 
-    String url, 
-    String label,
-    IconData icon,
-    Color iconColor,
-  ) {
-    final fileName = path.basename(url).split('?').first;
-    
-    return GestureDetector(
-      onTap: () => _openUrl(url),
-      child: Container(
-        padding: const EdgeInsets.all(12),
-        decoration: BoxDecoration(
-          color: Colors.black12,
-          borderRadius: BorderRadius.circular(8),
-          border: Border.all(color: Colors.white10),
-        ),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: iconColor, size: 32),
-            const SizedBox(width: 12),
-            Flexible(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    fileName,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontWeight: FontWeight.w500,
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    label,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.7),
-                      fontSize: 12,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  /// Get attachment preview for selected file
+  /// Build attachment preview for selected file
   Widget _getAttachmentPreview(File file) {
     final extension = path.extension(file.path).toLowerCase();
     
@@ -612,19 +511,19 @@ class ChatScreen extends HookConsumerWidget {
       );
     }
     
-    // For videos
-    if (['.mp4', '.mov', '.wmv', '.avi', '.flv'].contains(extension)) {
-      return Icon(
-        Icons.video_file,
-        size: 30,
-        color: Colors.red.withOpacity(0.8),
-      );
-    }
-    
     // For documents
-    if (['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.ppt', '.pptx'].contains(extension)) {
+    if (['.pdf', '.doc', '.docx', '.txt'].contains(extension)) {
+      IconData iconData;
+      if (extension == '.pdf') {
+        iconData = Icons.picture_as_pdf;
+      } else if (['.doc', '.docx'].contains(extension)) {
+        iconData = Icons.description;
+      } else {
+        iconData = Icons.text_snippet;
+      }
+      
       return Icon(
-        Icons.insert_drive_file,
+        iconData,
         size: 30,
         color: Colors.blue.withOpacity(0.8),
       );
@@ -638,6 +537,136 @@ class ChatScreen extends HookConsumerWidget {
     );
   }
   
+  /// Build attachment preview based on local file path
+  Widget _buildLocalAttachmentPreview(BuildContext context, Message message) {
+    final fileUrl = message.imageUrl;
+    if (fileUrl == null) return const SizedBox.shrink();
+    
+    // Try to determine file type
+    String fileType = '';
+    
+    try {
+      // Try to access additional metadata
+      final dynamic messageData = message;
+      if (messageData != null) {
+        try {
+          if (messageData.fileType != null) {
+            fileType = messageData.fileType;
+          } else if (messageData.toJson != null) {
+            final data = messageData.toJson();
+            if (data is Map && data.containsKey('fileType')) {
+              fileType = data['fileType'] as String? ?? '';
+            }
+          }
+        } catch (e) {
+          // Ignore any errors trying to access these fields
+          debugPrint('Error accessing message metadata: $e');
+        }
+      }
+      
+      // Fallback to extension if no explicit type
+      if (fileType.isEmpty) {
+        final ext = path.extension(fileUrl).toLowerCase();
+        if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].contains(ext)) {
+          fileType = 'image';
+        } else if (ext == '.pdf') {
+          fileType = 'pdf';
+        } else if (['.doc', '.docx'].contains(ext)) {
+          fileType = 'doc';
+        } else if (ext == '.txt') {
+          fileType = 'txt';
+        }
+      }
+    } catch (e) {
+      debugPrint('Error determining file type: $e');
+    }
+    
+    // Check if the file exists locally
+    final file = File(fileUrl);
+    final fileExists = file.existsSync();
+    
+    // Based on file type, render appropriate widget
+    if (fileType == 'image' && fileExists) {
+      // For images, try to display them
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image.file(
+          file,
+          fit: BoxFit.cover,
+          width: MediaQuery.of(context).size.width * 0.6,
+          errorBuilder: (context, error, stackTrace) {
+            debugPrint('Error loading image: $error');
+            return Container(
+              height: 120,
+              width: MediaQuery.of(context).size.width * 0.6,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade800,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.broken_image, color: Colors.white, size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Image could not be loaded',
+                    style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      // For documents, show an appropriate icon and file name
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade800,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _getFileIcon(fileType),
+              color: AppTheme.primaryColor,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                path.basename(fileUrl),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  /// Get an appropriate icon for file type
+  IconData _getFileIcon(String fileType) {
+    switch (fileType.toLowerCase()) {
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'doc':
+      case 'docx':
+        return Icons.description;
+      case 'txt':
+        return Icons.text_snippet;
+      default:
+        return Icons.insert_drive_file;
+    }
+  }
+  
   /// Open URL helper method
   Future<void> _openUrl(String url) async {
     if (await canLaunchUrl(Uri.parse(url))) {
@@ -647,14 +676,76 @@ class ChatScreen extends HookConsumerWidget {
   
   /// Select an attachment from device storage
   Future<void> _selectAttachment(BuildContext context, WidgetRef ref) async {
-    final result = await FilePicker.platform.pickFiles(
-      type: FileType.any,
-      allowMultiple: false,
+    // Show options dialog
+    final attachType = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        title: const Text('Choose attachment type',
+          style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.image, color: AppTheme.primaryColor),
+              title: const Text('Image', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context, 'image'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description, color: AppTheme.primaryColor),
+              title: const Text('Document', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context, 'document'),
+            ),
+          ],
+        ),
+      ),
     );
+
+    if (attachType == null) return;
+
+    // Handle based on type
+    File? file;
     
-    if (result != null && result.files.isNotEmpty && result.files.first.path != null) {
-      final file = File(result.files.first.path!);
-      ref.read(attachmentProvider.notifier).state = file;
+    try {
+      switch (attachType) {
+        case 'image':
+          // Use image picker to select an image
+          final picker = ImagePicker();
+          final pickedFile = await picker.pickImage(
+            source: ImageSource.gallery,
+            imageQuality: 70,  // Compress the image a bit
+          );
+          
+          if (pickedFile != null) {
+            file = File(pickedFile.path);
+            ref.read(attachmentTypeProvider.notifier).state = 'image';
+          }
+          break;
+          
+        case 'document':
+          // Use file picker to select a document
+          final result = await FilePicker.platform.pickFiles(
+            type: FileType.custom,
+            allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
+          );
+          
+          if (result != null && result.files.isNotEmpty && result.files.single.path != null) {
+            file = File(result.files.single.path!);
+            ref.read(attachmentTypeProvider.notifier).state = 'document';
+          }
+          break;
+      }
+      
+      if (file != null) {
+        ref.read(attachmentProvider.notifier).state = file;
+      }
+    } catch (e) {
+      debugPrint('Error selecting attachment: $e');
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Error selecting attachment: $e')),
+        );
+      }
     }
   }
   
@@ -667,6 +758,7 @@ class ChatScreen extends HookConsumerWidget {
   ) async {
     // Get current attachment (if any)
     final attachment = ref.read(attachmentProvider);
+    final attachmentType = ref.read(attachmentTypeProvider);
     
     // Early return if both message and attachment are empty
     if (text.trim().isEmpty && attachment == null) return;
@@ -677,7 +769,9 @@ class ChatScreen extends HookConsumerWidget {
     // Set the sending state to loading
     ref.read(messageSendingStateProvider.notifier).state = const AsyncValue.loading();
     
-    String? fileUrl;
+    String? localFilePath;
+    String? fileType;
+    String? fileName;
     
     try {
       // Get the current user
@@ -688,9 +782,50 @@ class ChatScreen extends HookConsumerWidget {
         throw Exception('User not logged in');
       }
       
-      // Handle file upload if there's an attachment
+      // Handle file locally if there's an attachment
       if (attachment != null) {
-        fileUrl = await _uploadFile(attachment, channelId, user.id, ref);
+        // Generate a unique ID for this file
+        final uuid = const Uuid().v4();
+        fileName = path.basename(attachment.path);
+        
+        // For images, save the file to temp directory
+        final fileBytes = await attachment.readAsBytes();
+        
+        try {
+          // Use the system's temp directory for storing files
+          final tempDir = Directory.systemTemp;
+          if (!await tempDir.exists()) {
+            await tempDir.create(recursive: true);
+          }
+          
+          // Create a local copy of the file
+          localFilePath = '${tempDir.path}/${uuid}_$fileName';
+          final localFile = File(localFilePath);
+          await localFile.writeAsBytes(fileBytes);
+          
+          // Determine file type
+          fileType = attachmentType ?? 'document';
+          
+          // If it's not explicitly set, try to determine from extension
+          if (fileType == null) {
+            final ext = path.extension(fileName).toLowerCase();
+            if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].contains(ext)) {
+              fileType = 'image';
+            } else if (ext == '.pdf') {
+              fileType = 'pdf';
+            } else if (['.doc', '.docx'].contains(ext)) {
+              fileType = 'doc';
+            } else if (ext == '.txt') {
+              fileType = 'txt';
+            } else {
+              fileType = 'document';
+            }
+          }
+        } catch (e) {
+          debugPrint('Error saving file locally: $e');
+          // Continue with the original file if local save fails
+          localFilePath = attachment.path;
+        }
       }
       
       // Send the message using the repository
@@ -701,12 +836,14 @@ class ChatScreen extends HookConsumerWidget {
         userName: user.name,
         userAvatarUrl: user.avatarUrl,
         text: text.trim(),
-        imageUrl: fileUrl,
+        imageUrl: localFilePath,
+        fileType: fileType,
+        fileName: fileName,
       );
       
       // Reset attachment
       ref.read(attachmentProvider.notifier).state = null;
-      ref.read(attachmentUploadProgressProvider.notifier).state = null;
+      ref.read(attachmentTypeProvider.notifier).state = null;
       
       // Reset the sending state
       if (context.mounted) {
@@ -725,34 +862,6 @@ class ChatScreen extends HookConsumerWidget {
         );
       }
     }
-  }
-  
-  /// Upload a file to Firebase Storage
-  Future<String> _uploadFile(File file, String channelId, String userId, WidgetRef ref) async {
-    // Create a unique filename using UUID
-    final uuid = const Uuid().v4();
-    final extension = path.extension(file.path);
-    final fileName = '$uuid$extension';
-    
-    // Create storage reference
-    final storageRef = FirebaseStorage.instance.ref();
-    final fileRef = storageRef.child('chat_attachments/$channelId/$userId/$fileName');
-    
-    // Upload the file with progress tracking
-    final uploadTask = fileRef.putFile(file);
-    
-    // Monitor upload progress
-    uploadTask.snapshotEvents.listen((TaskSnapshot snapshot) {
-      final progress = snapshot.bytesTransferred / snapshot.totalBytes;
-      ref.read(attachmentUploadProgressProvider.notifier).state = progress;
-    });
-    
-    // Wait for upload to complete
-    await uploadTask;
-    
-    // Get download URL
-    final downloadUrl = await fileRef.getDownloadURL();
-    return downloadUrl;
   }
   
   /// Format the timestamp for display

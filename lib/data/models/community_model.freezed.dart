@@ -365,6 +365,10 @@ mixin _$Message {
   String get text => throw _privateConstructorUsedError;
   String? get imageUrl =>
       throw _privateConstructorUsedError; // If the message contains an image
+  String? get fileType =>
+      throw _privateConstructorUsedError; // Type of the file (image, pdf, doc, etc.)
+  String? get fileName =>
+      throw _privateConstructorUsedError; // Name of the uploaded file
   MessageType get type => throw _privateConstructorUsedError;
   String? get replyToMessageId =>
       throw _privateConstructorUsedError; // If it's a reply to another message
@@ -392,6 +396,8 @@ abstract class $MessageCopyWith<$Res> {
       String? userAvatarUrl,
       String text,
       String? imageUrl,
+      String? fileType,
+      String? fileName,
       MessageType type,
       String? replyToMessageId,
       DateTime timestamp});
@@ -419,6 +425,8 @@ class _$MessageCopyWithImpl<$Res, $Val extends Message>
     Object? userAvatarUrl = freezed,
     Object? text = null,
     Object? imageUrl = freezed,
+    Object? fileType = freezed,
+    Object? fileName = freezed,
     Object? type = null,
     Object? replyToMessageId = freezed,
     Object? timestamp = null,
@@ -452,6 +460,14 @@ class _$MessageCopyWithImpl<$Res, $Val extends Message>
           ? _value.imageUrl
           : imageUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      fileType: freezed == fileType
+          ? _value.fileType
+          : fileType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      fileName: freezed == fileName
+          ? _value.fileName
+          : fileName // ignore: cast_nullable_to_non_nullable
+              as String?,
       type: null == type
           ? _value.type
           : type // ignore: cast_nullable_to_non_nullable
@@ -483,6 +499,8 @@ abstract class _$$MessageImplCopyWith<$Res> implements $MessageCopyWith<$Res> {
       String? userAvatarUrl,
       String text,
       String? imageUrl,
+      String? fileType,
+      String? fileName,
       MessageType type,
       String? replyToMessageId,
       DateTime timestamp});
@@ -508,6 +526,8 @@ class __$$MessageImplCopyWithImpl<$Res>
     Object? userAvatarUrl = freezed,
     Object? text = null,
     Object? imageUrl = freezed,
+    Object? fileType = freezed,
+    Object? fileName = freezed,
     Object? type = null,
     Object? replyToMessageId = freezed,
     Object? timestamp = null,
@@ -541,6 +561,14 @@ class __$$MessageImplCopyWithImpl<$Res>
           ? _value.imageUrl
           : imageUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      fileType: freezed == fileType
+          ? _value.fileType
+          : fileType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      fileName: freezed == fileName
+          ? _value.fileName
+          : fileName // ignore: cast_nullable_to_non_nullable
+              as String?,
       type: null == type
           ? _value.type
           : type // ignore: cast_nullable_to_non_nullable
@@ -568,6 +596,8 @@ class _$MessageImpl with DiagnosticableTreeMixin implements _Message {
       this.userAvatarUrl,
       required this.text,
       this.imageUrl,
+      this.fileType,
+      this.fileName,
       this.type = MessageType.user,
       this.replyToMessageId,
       required this.timestamp});
@@ -591,6 +621,12 @@ class _$MessageImpl with DiagnosticableTreeMixin implements _Message {
   final String? imageUrl;
 // If the message contains an image
   @override
+  final String? fileType;
+// Type of the file (image, pdf, doc, etc.)
+  @override
+  final String? fileName;
+// Name of the uploaded file
+  @override
   @JsonKey()
   final MessageType type;
   @override
@@ -601,7 +637,7 @@ class _$MessageImpl with DiagnosticableTreeMixin implements _Message {
 
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'Message(id: $id, channelId: $channelId, userId: $userId, userName: $userName, userAvatarUrl: $userAvatarUrl, text: $text, imageUrl: $imageUrl, type: $type, replyToMessageId: $replyToMessageId, timestamp: $timestamp)';
+    return 'Message(id: $id, channelId: $channelId, userId: $userId, userName: $userName, userAvatarUrl: $userAvatarUrl, text: $text, imageUrl: $imageUrl, fileType: $fileType, fileName: $fileName, type: $type, replyToMessageId: $replyToMessageId, timestamp: $timestamp)';
   }
 
   @override
@@ -616,6 +652,8 @@ class _$MessageImpl with DiagnosticableTreeMixin implements _Message {
       ..add(DiagnosticsProperty('userAvatarUrl', userAvatarUrl))
       ..add(DiagnosticsProperty('text', text))
       ..add(DiagnosticsProperty('imageUrl', imageUrl))
+      ..add(DiagnosticsProperty('fileType', fileType))
+      ..add(DiagnosticsProperty('fileName', fileName))
       ..add(DiagnosticsProperty('type', type))
       ..add(DiagnosticsProperty('replyToMessageId', replyToMessageId))
       ..add(DiagnosticsProperty('timestamp', timestamp));
@@ -637,6 +675,10 @@ class _$MessageImpl with DiagnosticableTreeMixin implements _Message {
             (identical(other.text, text) || other.text == text) &&
             (identical(other.imageUrl, imageUrl) ||
                 other.imageUrl == imageUrl) &&
+            (identical(other.fileType, fileType) ||
+                other.fileType == fileType) &&
+            (identical(other.fileName, fileName) ||
+                other.fileName == fileName) &&
             (identical(other.type, type) || other.type == type) &&
             (identical(other.replyToMessageId, replyToMessageId) ||
                 other.replyToMessageId == replyToMessageId) &&
@@ -646,8 +688,20 @@ class _$MessageImpl with DiagnosticableTreeMixin implements _Message {
 
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
-  int get hashCode => Object.hash(runtimeType, id, channelId, userId, userName,
-      userAvatarUrl, text, imageUrl, type, replyToMessageId, timestamp);
+  int get hashCode => Object.hash(
+      runtimeType,
+      id,
+      channelId,
+      userId,
+      userName,
+      userAvatarUrl,
+      text,
+      imageUrl,
+      fileType,
+      fileName,
+      type,
+      replyToMessageId,
+      timestamp);
 
   /// Create a copy of Message
   /// with the given fields replaced by the non-null parameter values.
@@ -674,6 +728,8 @@ abstract class _Message implements Message {
       final String? userAvatarUrl,
       required final String text,
       final String? imageUrl,
+      final String? fileType,
+      final String? fileName,
       final MessageType type,
       final String? replyToMessageId,
       required final DateTime timestamp}) = _$MessageImpl;
@@ -694,6 +750,10 @@ abstract class _Message implements Message {
   String get text;
   @override
   String? get imageUrl; // If the message contains an image
+  @override
+  String? get fileType; // Type of the file (image, pdf, doc, etc.)
+  @override
+  String? get fileName; // Name of the uploaded file
   @override
   MessageType get type;
   @override
@@ -973,6 +1033,10 @@ mixin _$AIMessage {
   String get content => throw _privateConstructorUsedError;
   String? get imageUrl =>
       throw _privateConstructorUsedError; // For image uploads by user
+  String? get fileType =>
+      throw _privateConstructorUsedError; // Type of the file (image, pdf, doc, etc.)
+  String? get fileName =>
+      throw _privateConstructorUsedError; // Name of the uploaded file
   DateTime get timestamp => throw _privateConstructorUsedError;
 
   /// Serializes this AIMessage to a JSON map.
@@ -996,6 +1060,8 @@ abstract class $AIMessageCopyWith<$Res> {
       bool isUserMessage,
       String content,
       String? imageUrl,
+      String? fileType,
+      String? fileName,
       DateTime timestamp});
 }
 
@@ -1019,6 +1085,8 @@ class _$AIMessageCopyWithImpl<$Res, $Val extends AIMessage>
     Object? isUserMessage = null,
     Object? content = null,
     Object? imageUrl = freezed,
+    Object? fileType = freezed,
+    Object? fileName = freezed,
     Object? timestamp = null,
   }) {
     return _then(_value.copyWith(
@@ -1042,6 +1110,14 @@ class _$AIMessageCopyWithImpl<$Res, $Val extends AIMessage>
           ? _value.imageUrl
           : imageUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      fileType: freezed == fileType
+          ? _value.fileType
+          : fileType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      fileName: freezed == fileName
+          ? _value.fileName
+          : fileName // ignore: cast_nullable_to_non_nullable
+              as String?,
       timestamp: null == timestamp
           ? _value.timestamp
           : timestamp // ignore: cast_nullable_to_non_nullable
@@ -1064,6 +1140,8 @@ abstract class _$$AIMessageImplCopyWith<$Res>
       bool isUserMessage,
       String content,
       String? imageUrl,
+      String? fileType,
+      String? fileName,
       DateTime timestamp});
 }
 
@@ -1085,6 +1163,8 @@ class __$$AIMessageImplCopyWithImpl<$Res>
     Object? isUserMessage = null,
     Object? content = null,
     Object? imageUrl = freezed,
+    Object? fileType = freezed,
+    Object? fileName = freezed,
     Object? timestamp = null,
   }) {
     return _then(_$AIMessageImpl(
@@ -1108,6 +1188,14 @@ class __$$AIMessageImplCopyWithImpl<$Res>
           ? _value.imageUrl
           : imageUrl // ignore: cast_nullable_to_non_nullable
               as String?,
+      fileType: freezed == fileType
+          ? _value.fileType
+          : fileType // ignore: cast_nullable_to_non_nullable
+              as String?,
+      fileName: freezed == fileName
+          ? _value.fileName
+          : fileName // ignore: cast_nullable_to_non_nullable
+              as String?,
       timestamp: null == timestamp
           ? _value.timestamp
           : timestamp // ignore: cast_nullable_to_non_nullable
@@ -1125,6 +1213,8 @@ class _$AIMessageImpl with DiagnosticableTreeMixin implements _AIMessage {
       required this.isUserMessage,
       required this.content,
       this.imageUrl,
+      this.fileType,
+      this.fileName,
       required this.timestamp});
 
   factory _$AIMessageImpl.fromJson(Map<String, dynamic> json) =>
@@ -1143,11 +1233,17 @@ class _$AIMessageImpl with DiagnosticableTreeMixin implements _AIMessage {
   final String? imageUrl;
 // For image uploads by user
   @override
+  final String? fileType;
+// Type of the file (image, pdf, doc, etc.)
+  @override
+  final String? fileName;
+// Name of the uploaded file
+  @override
   final DateTime timestamp;
 
   @override
   String toString({DiagnosticLevel minLevel = DiagnosticLevel.info}) {
-    return 'AIMessage(id: $id, conversationId: $conversationId, isUserMessage: $isUserMessage, content: $content, imageUrl: $imageUrl, timestamp: $timestamp)';
+    return 'AIMessage(id: $id, conversationId: $conversationId, isUserMessage: $isUserMessage, content: $content, imageUrl: $imageUrl, fileType: $fileType, fileName: $fileName, timestamp: $timestamp)';
   }
 
   @override
@@ -1160,6 +1256,8 @@ class _$AIMessageImpl with DiagnosticableTreeMixin implements _AIMessage {
       ..add(DiagnosticsProperty('isUserMessage', isUserMessage))
       ..add(DiagnosticsProperty('content', content))
       ..add(DiagnosticsProperty('imageUrl', imageUrl))
+      ..add(DiagnosticsProperty('fileType', fileType))
+      ..add(DiagnosticsProperty('fileName', fileName))
       ..add(DiagnosticsProperty('timestamp', timestamp));
   }
 
@@ -1176,6 +1274,10 @@ class _$AIMessageImpl with DiagnosticableTreeMixin implements _AIMessage {
             (identical(other.content, content) || other.content == content) &&
             (identical(other.imageUrl, imageUrl) ||
                 other.imageUrl == imageUrl) &&
+            (identical(other.fileType, fileType) ||
+                other.fileType == fileType) &&
+            (identical(other.fileName, fileName) ||
+                other.fileName == fileName) &&
             (identical(other.timestamp, timestamp) ||
                 other.timestamp == timestamp));
   }
@@ -1183,7 +1285,7 @@ class _$AIMessageImpl with DiagnosticableTreeMixin implements _AIMessage {
   @JsonKey(includeFromJson: false, includeToJson: false)
   @override
   int get hashCode => Object.hash(runtimeType, id, conversationId,
-      isUserMessage, content, imageUrl, timestamp);
+      isUserMessage, content, imageUrl, fileType, fileName, timestamp);
 
   /// Create a copy of AIMessage
   /// with the given fields replaced by the non-null parameter values.
@@ -1208,6 +1310,8 @@ abstract class _AIMessage implements AIMessage {
       required final bool isUserMessage,
       required final String content,
       final String? imageUrl,
+      final String? fileType,
+      final String? fileName,
       required final DateTime timestamp}) = _$AIMessageImpl;
 
   factory _AIMessage.fromJson(Map<String, dynamic> json) =
@@ -1223,6 +1327,10 @@ abstract class _AIMessage implements AIMessage {
   String get content;
   @override
   String? get imageUrl; // For image uploads by user
+  @override
+  String? get fileType; // Type of the file (image, pdf, doc, etc.)
+  @override
+  String? get fileName; // Name of the uploaded file
   @override
   DateTime get timestamp;
 

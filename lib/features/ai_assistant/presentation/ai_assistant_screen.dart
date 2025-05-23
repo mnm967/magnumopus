@@ -12,6 +12,12 @@ import 'package:magnumopus/data/repositories/community_repository.dart';
 import 'package:magnumopus/services/openai_service.dart';
 import 'package:magnumopus/services/stock_service.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:io';
+import 'package:file_picker/file_picker.dart';
+import 'package:image_picker/image_picker.dart';
+import 'package:firebase_storage/firebase_storage.dart';
+import 'package:path/path.dart' as path;
+import 'package:uuid/uuid.dart';
 
 /// Global key for navigator state access
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -725,6 +731,13 @@ class AIAssistantScreen extends HookConsumerWidget {
               ),
             ),
             
+            // If there's an image, display it
+            if (message.imageUrl != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 8),
+                child: _buildAttachmentWidget(context, message),
+              ),
+            
             // Timestamp
             const SizedBox(height: 4),
             Text(
@@ -743,6 +756,137 @@ class AIAssistantScreen extends HookConsumerWidget {
         duration: 300.ms,
       ),
     );
+  }
+  
+  /// Build an attachment widget based on its type
+  Widget _buildAttachmentWidget(BuildContext context, AIMessage message) {
+    final fileUrl = message.imageUrl;
+    if (fileUrl == null) return const SizedBox.shrink();
+    
+    // Try to determine file type
+    String fileType = '';
+    String? fileName;
+    
+    try {
+      // Try to access additional metadata using dynamic approach
+      // This accesses Firestore document data that may not be in the AIMessage model
+      final dynamic messageData = message;
+      if (messageData != null) {
+        try {
+          if (messageData.fileType != null) {
+            fileType = messageData.fileType;
+          } else if (messageData.toJson != null) {
+            final data = messageData.toJson();
+            if (data is Map && data.containsKey('fileType')) {
+              fileType = data['fileType'] as String? ?? '';
+            }
+            if (data is Map && data.containsKey('fileName')) {
+              fileName = data['fileName'] as String?;
+            }
+          }
+        } catch (e) {
+          // Ignore any errors trying to access these fields
+          debugPrint('Error accessing message metadata: $e');
+        }
+      }
+      
+      // Fallback to extension if no explicit type
+      if (fileType.isEmpty) {
+        final ext = path.extension(fileUrl).toLowerCase();
+        if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].contains(ext)) {
+          fileType = 'image';
+        } else if (ext == '.pdf') {
+          fileType = 'pdf';
+        } else if (['.doc', '.docx'].contains(ext)) {
+          fileType = 'doc';
+        } else if (ext == '.txt') {
+          fileType = 'txt';
+        }
+      }
+    } catch (e) {
+      debugPrint('Error determining file type: $e');
+    }
+    
+    // Based on file type, render appropriate widget
+    if (fileType == 'image') {
+      // For images, try to display them
+      return ClipRRect(
+        borderRadius: BorderRadius.circular(8),
+        child: Image(
+          image: FileImage(File(fileUrl)),
+          fit: BoxFit.cover,
+          width: MediaQuery.of(context).size.width * 0.6,
+          errorBuilder: (context, error, stackTrace) {
+            debugPrint('Error loading image: $error');
+            return Container(
+              height: 120,
+              width: MediaQuery.of(context).size.width * 0.6,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade800,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Icon(Icons.broken_image, color: Colors.white, size: 32),
+                  const SizedBox(height: 8),
+                  Text(
+                    'Image could not be loaded',
+                    style: TextStyle(color: Colors.white.withOpacity(0.7)),
+                  ),
+                ],
+              ),
+            );
+          },
+        ),
+      );
+    } else {
+      // For documents, show an appropriate icon and file name
+      return Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade800,
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              _getFileIcon(fileType),
+              color: AppTheme.primaryColor,
+              size: 24,
+            ),
+            const SizedBox(width: 8),
+            Flexible(
+              child: Text(
+                fileName ?? path.basename(fileUrl),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w500,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+  
+  /// Get an appropriate icon for file type
+  IconData _getFileIcon(String fileType) {
+    switch (fileType.toLowerCase()) {
+      case 'pdf':
+        return Icons.picture_as_pdf;
+      case 'doc':
+      case 'docx':
+        return Icons.description;
+      case 'txt':
+        return Icons.text_snippet;
+      default:
+        return Icons.insert_drive_file;
+    }
   }
   
   /// Build the message input area
@@ -776,9 +920,7 @@ class AIAssistantScreen extends HookConsumerWidget {
               Icons.attach_file,
               color: Colors.white.withOpacity(0.6),
             ),
-            onPressed: () {
-              // Image upload logic
-            },
+            onPressed: () => _handleAttach(context, ref, conversation),
           ),
           
           // Text input field
@@ -1185,9 +1327,7 @@ class AIAssistantScreen extends HookConsumerWidget {
     try {
       // Since the repository has a private _addAIResponse method,
       // we'll need to implement a similar functionality here
-      final firestore = FirebaseFirestore.instance;
-      
-      await firestore
+      await FirebaseFirestore.instance
         .collection('ai_conversations')
         .doc(conversationId)
         .collection('messages')
@@ -1229,6 +1369,177 @@ class AIAssistantScreen extends HookConsumerWidget {
       return 'Yesterday';
     } else {
       return '${date.month}/${date.day}/${date.year}';
+    }
+  }
+  
+  /// Handle file attachment (images and documents)
+  void _handleAttach(BuildContext context, WidgetRef ref, AIConversation? conversation) async {
+    if (conversation == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Start a conversation first')),
+      );
+      return;
+    }
+
+    // Show options dialog
+    final attachType = await showDialog<String>(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: AppTheme.cardColor,
+        title: const Text('Choose attachment type',
+          style: TextStyle(color: Colors.white)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.image, color: AppTheme.primaryColor),
+              title: const Text('Image', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context, 'image'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.description, color: AppTheme.primaryColor),
+              title: const Text('Document', style: TextStyle(color: Colors.white)),
+              onTap: () => Navigator.pop(context, 'document'),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (attachType == null) return;
+
+    // Handle based on type
+    File? file;
+    String? fileName;
+    
+    // Start loading
+    ref.read(chatStateProvider.notifier).startLoading();
+    
+    try {
+      switch (attachType) {
+        case 'image':
+          // Use image picker to select an image
+          final picker = ImagePicker();
+          final pickedFile = await picker.pickImage(
+            source: ImageSource.gallery,
+            imageQuality: 70,  // Compress the image a bit
+          );
+          
+          if (pickedFile != null) {
+            file = File(pickedFile.path);
+            fileName = path.basename(pickedFile.path);
+          }
+          break;
+          
+        case 'document':
+          // Use file picker to select a document
+          final result = await FilePicker.platform.pickFiles(
+            type: FileType.custom,
+            allowedExtensions: ['pdf', 'doc', 'docx', 'txt'],
+          );
+          
+          if (result != null && result.files.isNotEmpty && result.files.single.path != null) {
+            file = File(result.files.single.path!);
+            fileName = result.files.single.name;
+          }
+          break;
+      }
+      
+      if (file == null) {
+        ref.read(chatStateProvider.notifier).reset();
+        return;
+      }
+      
+      // Generate a unique ID for this file
+      final uuid = const Uuid().v4();
+      
+      // For images, save the file to app documents directory
+      final fileBytes = await file.readAsBytes();
+      String localFilePath = '';
+      
+      try {
+        // Use the application's temp directory for storing files (works on both mobile and web)
+        final tempDir = Directory.systemTemp;
+        if (!await tempDir.exists()) {
+          await tempDir.create(recursive: true);
+        }
+        
+        // Create a local copy of the file
+        localFilePath = '${tempDir.path}/${uuid}_$fileName';
+        final localFile = File(localFilePath);
+        await localFile.writeAsBytes(fileBytes);
+        
+      } catch (e) {
+        debugPrint('Error saving file locally: $e');
+        // Continue with the original file if local save fails
+        localFilePath = file.path;
+      }
+      
+      // Create a message prompt
+      String userMessage = attachType == 'image'
+          ? 'Image for analysis:'
+          : 'Document for analysis:';
+          
+      String fileType = attachType == 'image' 
+          ? 'image' 
+          : path.extension(fileName ?? 'file').replaceAll('.', '');
+          
+      // Add the file message to the chat
+      await FirebaseFirestore.instance
+          .collection('ai_conversations')
+          .doc(conversation.id)
+          .collection('messages')
+          .add({
+            'isUserMessage': true,
+            'content': userMessage,
+            'imageUrl': localFilePath,
+            'fileType': fileType,
+            'fileName': fileName,
+            'timestamp': FieldValue.serverTimestamp(),
+          });
+      
+      // Get AI response for the file
+      final openAIService = ref.read(openAIServiceProvider);
+      String aiResponse;
+      
+      if (attachType == 'image') {
+        // Process the image directly with the OpenAI API
+        aiResponse = await openAIService.processImageWithChatGPT(
+          prompt: "Please analyze this image and tell me what you see, especially anything related to trading, charts, or financial information.",
+          imageFile: file,
+        );
+      } else {
+        // Process the document with the OpenAI API
+        aiResponse = await openAIService.processDocumentWithChatGPT(
+          prompt: "Please analyze this document and extract any relevant trading information, patterns, or insights. If there are any charts, data, or trading strategies, please explain them in detail.",
+          documentFile: file,
+        );
+      }
+      
+      // Add AI response directly to Firestore
+      await FirebaseFirestore.instance
+        .collection('ai_conversations')
+        .doc(conversation.id)
+        .collection('messages')
+        .add({
+          'isUserMessage': false,
+          'content': aiResponse,
+          'timestamp': FieldValue.serverTimestamp(),
+        });
+      
+      // Update conversation last updated time
+      await FirebaseFirestore.instance
+          .collection('ai_conversations')
+          .doc(conversation.id)
+          .update({
+            'lastUpdatedAt': FieldValue.serverTimestamp(),
+          });
+      
+      // Reset loading state
+      ref.read(chatStateProvider.notifier).reset();
+    } catch (e) {
+      debugPrint('Error handling attachment: $e');
+      ref.read(chatStateProvider.notifier).setError('Error processing attachment');
     }
   }
 } 
